@@ -1,3 +1,4 @@
+import { isArray, isBuffer, withNativeBlob, withNativeFile } from '../shared/natives'
 import { Packet } from './parser'
 
 export interface BufferPlaceholder {
@@ -20,12 +21,12 @@ export function deconstructPacket(packet: Packet): { packet: Packet; buffers: an
 
 function _deconstructPacket(data: Packet['data'], buffers: any[]): Packet['data'] {
   if (!data) return data
-  if (Buffer.isBuffer(data)) {
+  if (isBuffer(data)) {
     const placeholder: BufferPlaceholder = { _placeholder: true, num: buffers.length }
     buffers.push(data)
     return placeholder
   }
-  if (Array.isArray(data)) return data.map(d => _deconstructPacket(d, buffers))
+  if (isArray(data)) return data.map(d => _deconstructPacket(d, buffers))
   if (typeof data === 'object' && !(data instanceof Date))
     return Object.fromEntries(Object.entries(data).map(([key, value]) => [key, _deconstructPacket(value, buffers)]))
   return data
@@ -46,7 +47,7 @@ function _reconstructPacket(data: Packet['data'], buffers: any[]): Packet['data'
     if (isIndexValid) return buffers[data.num]
     throw new Error('Illegal attachments')
   }
-  if (Array.isArray(data)) return data.map(d => _reconstructPacket(d, buffers))
+  if (isArray(data)) return data.map(d => _reconstructPacket(d, buffers))
   if (typeof data === 'object') return Object.fromEntries(Object.entries(data).map(([key, value]) => [key, _reconstructPacket(value, buffers)]))
   return data
 }
@@ -58,7 +59,7 @@ export function removeBlobs(data: any) {
     const removeBlobs = (data: any, key?: string | number, parent?: any) => {
       if (!data) return data
 
-      if (data instanceof Blob || data instanceof File) {
+      if ((withNativeBlob && data instanceof Blob) || (withNativeFile && data instanceof File)) {
         pendingBlobs++
         const fileReader = new FileReader()
 
@@ -69,9 +70,9 @@ export function removeBlobs(data: any) {
         }
 
         fileReader.readAsArrayBuffer(data)
-      } else if (Array.isArray(data)) {
+      } else if (isArray(data)) {
         data.forEach((value, index) => removeBlobs(value, index, data))
-      } else if (typeof data === 'object' && !Buffer.isBuffer(data)) {
+      } else if (typeof data === 'object' && !isBuffer(data)) {
         Object.entries(data).map(([key, value]) => removeBlobs(value, key, data))
       }
     }

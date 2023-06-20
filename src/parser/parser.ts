@@ -1,11 +1,15 @@
 import EventEmitter from 'events'
 import { deconstructPacket, reconstructPacket, removeBlobs } from './binary'
+import { isBuffer } from '../shared/natives'
 
 export interface Packet {
   type: Types
-  data: any
+  data?: any
+  id?: number
   nsp?: string
   attachments?: number
+  options?: any
+  query?: string
 }
 
 export type EncoderCallback = (data: any) => void
@@ -59,7 +63,7 @@ export class Decoder extends EventEmitter {
       }
     }
 
-    if (Buffer.isBuffer(data) || data.base64) {
+    if (isBuffer(data) || data.base64) {
       if (!this.reconstructor) throw new Error('Got binary data when not reconstructing a packet')
       const packet = this.reconstructor.takeBinaryData(data)
       if (!packet) return
