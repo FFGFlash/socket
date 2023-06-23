@@ -14,7 +14,7 @@ export enum Packets {
   noop,
 }
 
-const PacketsList = Object.keys(Packets)
+export const PacketsList = Object.keys(Packets)
 
 const ErrorPacket = { type: 'error', data: 'parser error' }
 
@@ -65,14 +65,14 @@ export function encodeBase64Packet(packet: Packet, callback: EncodePacketCallbac
   return callback(message)
 }
 
-export function decodePacket(data: any, binaryType: any, utf8decode: boolean) {
+export function decodePacket(data: string | ArrayBuffer | Buffer, binaryType: any, utf8decode?: boolean) {
   if (data === undefined) return ErrorPacket
   if (typeof data === 'string') {
     if (data.charAt(0) === 'b') return decodeBase64Packet(data.substring(1), binaryType)
     let type = data.charAt(0)
     if (utf8decode) {
       try {
-        data = wtf8.decode(data)
+        data = wtf8.decode(data) as string
       } catch (e) {
         return ErrorPacket
       }
@@ -89,8 +89,8 @@ export function decodePacket(data: any, binaryType: any, utf8decode: boolean) {
   }
 
   if (data instanceof ArrayBuffer) data = arrayBufferToBuffer(data)
-  const type = PacketsList[Number(data[0])]
-  return { type, data: data.slice(1) }
+  const type = PacketsList[Number((data as Buffer)[0])]
+  return { type, data: (data as Buffer).subarray(1) }
 }
 
 export function decodeBase64Packet(message: string, binaryType: any) {
@@ -142,7 +142,89 @@ export function encodePayloadAsBinary(packets: Packet[], callback: EncodePacketC
   callback(Buffer.concat(results))
 }
 
-export function decodePayload(data: any, binaryType: any, callback: any) {}
+export function decodePayload(data: string | Buffer, binaryType?: any, callback: any = () => undefined) {
+  if (typeof data !== 'string') return decodePayloadAsBinary(data, binaryType, callback)
+  if (typeof binaryType === 'function') {
+    callback = binaryType
+    binaryType = undefined
+  }
+
+  let packet
+  if (data === '') return callback(ErrorPacket, 0, 1)
+
+  let length = ''
+  let n: number, msg: string
+  for (let i = 0, l = data.length; i < l; i++) {
+    const char = data.charAt(i)
+    if (char !== ':') {
+      length += char
+      continue
+    }
+
+    if (length === '' || isNaN((n = Number(length)))) return callback(ErrorPacket, 0, 1)
+
+    const s = i + 1
+    msg = data.substring(s, s + n)
+
+    if (n !== msg.length) return callback(ErrorPacket, 0, 1)
+
+    if (msg.length) {
+      packet = decodePacket(msg, binaryType, true)
+      if (ErrorPacket.type === packet.type && 'data' in packet && ErrorPacket.data === packet.data) return callback(ErrorPacket, 0, 1)
+      const ret = callback(packet, i + n, l)
+      if (ret === false) return
+    }
+
+    i += n
+    length = ''
+  }
+
+  if (length !== '') return callback(ErrorPacket, 0, 1)
+}
+
+export function decodePayloadAsBinary(data: Buffer, binaryType: any, callback: any = () => undefined) {
+  if (typeof binaryType === 'function') {
+    callback = binaryType
+    binaryType = null
+  }
+
+  let bufferTail = data
+  const buffers: (string | Buffer)[] = []
+
+  while (bufferTail.length > 0) {
+    let strLen = ''
+    let numTooLong = false
+    const isString = bufferTail[0] === 0
+    let i = 1
+    while (i++) {
+      if (bufferTail[i] === 255) break
+      if (strLen.length > 310) {
+        numTooLong = true
+        break
+      }
+      strLen += '' + bufferTail[i]
+    }
+
+    if (numTooLong) return callback(ErrorPacket, 0, 1)
+
+    bufferTail = bufferTail.subarray(strLen.length + 1)
+
+    const msgLen = parseInt(strLen, 10)
+    let msg: string | Buffer = bufferTail.subarray(1, msgLen + 1)
+    if (isString) msg = bufferToString(msg)
+    buffers.push(msg)
+    bufferTail = bufferTail.subarray(msgLen + 1)
+  }
+
+  const total = buffers.length
+  buffers.forEach((buffer, i) => callback(decodePacket(buffer, binaryType, true), i, total))
+}
+
+function bufferToString(buf: Buffer) {
+  let str = ''
+  for (let i = 0; i < buf.length; i++) str += String.fromCharCode(buf[i])
+  return str
+}
 
 function stringToBuffer(str: string) {
   const buffer = Buffer.alloc(str.length)
@@ -167,5 +249,6 @@ function arrayBufferToBuffer(data: any) {
 
 export interface Packet {
   type: keyof typeof Packets
-  data: any
+  data?: any
+  options?: any
 }

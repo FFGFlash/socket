@@ -6,6 +6,7 @@ import DataError from './dataError'
 import { boundMethod } from 'autobind-decorator'
 import Socket, { SocketOptions } from 'src/socket/socket'
 import { indexOf } from 'src/shared/natives'
+import Engine from 'src/engine/engine'
 
 export enum ReadyStates {
   OPEN = 'open',
@@ -38,7 +39,7 @@ export default class Manager extends EventEmitter {
   packetBuffer: Packet[] = []
   encoder = new Encoder()
   decoder = new Decoder()
-  engine?: any
+  engine?: Engine
   skipReconnect?: boolean
   private backOff: BackOff
   #reconnection!: boolean
@@ -97,9 +98,10 @@ export default class Manager extends EventEmitter {
   }
 
   private updateSocketIDs() {
+    const socket = this.engine!
     for (let nsp in this.nsps) {
       if (!Object.prototype.hasOwnProperty.call(this.nsps, nsp)) continue
-      this.nsps[nsp].id = this.engine.id
+      this.nsps[nsp].id = socket.id
     }
   }
 
@@ -149,7 +151,7 @@ export default class Manager extends EventEmitter {
     this.cleanup()
     this.readyState = ReadyStates.OPEN
     this.emit('open')
-    const socket = this.engine
+    const socket = this.engine!
     this.subs.push(on(socket, 'data', this.onData))
     this.subs.push(on(socket, 'ping', this.onPing))
     this.subs.push(on(socket, 'pong', this.onPong))
@@ -210,7 +212,7 @@ export default class Manager extends EventEmitter {
       }
 
       socket.on('connecting', onConnecting)
-      socket.on('connect', () => (socket.id = this.engine.id))
+      socket.on('connect', () => (socket.id = this.engine!.id))
 
       if (this.autoConnect) onConnecting()
     }
@@ -229,7 +231,7 @@ export default class Manager extends EventEmitter {
     if (!this.encoding) {
       this.encoding = true
       const packets = await this.encoder.encode(packet)
-      packets.forEach(data => this.engine.write(data, packet))
+      packets.forEach(data => this.engine!.write(data, packet))
       this.encoding = false
       this.processPacketQueue()
     } else {

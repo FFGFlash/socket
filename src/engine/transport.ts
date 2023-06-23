@@ -1,5 +1,7 @@
 import Engine from './engine'
 import EventEmitter from 'events'
+import { Packet, decodePacket } from './parser'
+import { boundMethod } from 'autobind-decorator'
 
 export default abstract class Transport extends EventEmitter implements TransportOptions {
   abstract name: string
@@ -21,7 +23,7 @@ export default abstract class Transport extends EventEmitter implements Transpor
   ciphers
   rejectUnauthorized
   forceNode
-  extraHeader
+  extraHeaders
   localAddress
   readyState = ReadyState.CLOSED
   writable = false
@@ -53,30 +55,40 @@ export default abstract class Transport extends EventEmitter implements Transpor
     this.ciphers = this.#options.ciphers
     this.rejectUnauthorized = this.#options.rejectUnauthorized
     this.forceNode = this.#options.forceNode
-    this.extraHeader = this.#options.extraHeader
+    this.extraHeaders = this.#options.extraHeaders
     this.localAddress = this.#options.localAddress
   }
 
-  onError(msg: string, desc: string) {
+  @boundMethod
+  onError(msg: string, desc: any) {
     const err = new TransportError(msg, 'TransportError', desc)
     this.emit('error', err)
     return this
   }
 
+  @boundMethod
   onOpen() {
     this.readyState = ReadyState.OPEN
     this.writable = true
     this.emit('open')
   }
 
+  @boundMethod
   onData(data: any) {
-    const packet = decodePacket(data, this.socket.binaryType)
-    this.onPacket(packet)
+    const packet = decodePacket(data, this.socket!.binaryType)
+    this.onPacket(packet as Packet)
   }
 
-  onPacket(packet: Packet) {}
+  @boundMethod
+  onPacket(packet: Packet) {
+    this.emit('packet', packet)
+  }
 
-  onClose() {}
+  @boundMethod
+  onClose() {
+    this.readyState = ReadyState.CLOSED
+    this.emit('close')
+  }
 
   open() {
     if (this.readyState !== ReadyState.CLOSED && (this.readyState as string) !== '') return this
@@ -117,6 +129,8 @@ export enum ReadyState {
   CLOSED = 'closed',
   OPENING = 'OPENING',
   OPEN = 'open',
+  PAUSED = 'paused',
+  PAUSING = 'pausing',
 }
 
 export interface TransportOptions {
@@ -125,7 +139,7 @@ export interface TransportOptions {
   hostname?: string
   port?: string
   secure?: boolean
-  query?: string
+  query?: any
   timestampParam?: string
   timestampRequests?: boolean
   socket?: Engine
@@ -138,6 +152,6 @@ export interface TransportOptions {
   ciphers?: string
   rejectUnauthorized?: boolean
   forceNode?: boolean
-  extraHeader?: string
+  extraHeaders?: string
   localAddress?: string
 }

@@ -1,12 +1,12 @@
 import parseUri, { ParsedURI } from './parseURI'
 
-export default function url(uri: string | ParsedURI, location = window.location) {
+export default function url(uri: string | ParsedURI, location = global.window.location) {
   let obj: any
   if (null == uri) uri = `${location.protocol}//${location.host}`
 
   if ('string' === typeof uri) {
-    if ('/' === uri.charAt(0)) uri = `${'/' === uri.charAt(1) ? location.protocol : location.host}${uri}`
-    if (!ProtocolRegex.test(uri)) uri = `${'undefined' !== typeof location ? location.protocol : 'https:'}//${uri}`
+    if ('/' === uri.charAt(0)) uri = `${'/' === uri.charAt(1) ? global.location.protocol : global.location.host}${uri}`
+    if (!ProtocolRegex.test(uri)) uri = `${'undefined' !== typeof global.location ? global.location.protocol : 'https:'}//${uri}`
     obj = parseUri(uri)
   } else obj = uri
 
