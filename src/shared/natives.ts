@@ -1,5 +1,8 @@
 const toString = Object.prototype.toString
 
+export const isAndroid = typeof navigator !== undefined && /Android/i.test(navigator.userAgent)
+export const isPhantom = typeof navigator !== undefined && /PhantomJS/i.test(navigator.userAgent)
+
 export const withNativeBuffer = typeof Buffer === 'function' && typeof Buffer.isBuffer === 'function'
 export const withNativeBlob = typeof Blob === 'function' || (typeof Blob !== 'undefined' && toString.call(Blob) === '[object BlobConstructor]')
 export const withNativeFile = typeof File === 'function' || (typeof File !== 'undefined' && toString.call(File) === '[object FileConstructor]')

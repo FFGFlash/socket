@@ -1,24 +1,5 @@
 import wtf8 from 'wtf-8'
-
-export const Protocol = 3
-
-export enum Packets {
-  /** non-ws */
-  open = 0,
-  /** non-ws */
-  close,
-  ping,
-  pong,
-  message,
-  upgrade,
-  noop,
-}
-
-export const PacketsList = Object.keys(Packets)
-
-const ErrorPacket = { type: 'error', data: 'parser error' }
-
-type EncodePacketCallback = (encodedPacket: string | Buffer) => void
+import { Packets, PacketsList, ErrorPacket, Packet, EncodePacketCallback, setLengthHeader } from './shared'
 
 export function encodePacket(packet: Packet, callback: EncodePacketCallback): void
 export function encodePacket(packet: Packet, supportsBinary: boolean, callback: EncodePacketCallback): void
@@ -120,7 +101,7 @@ export function encodePayload(
 
   const results: string[] = []
   packets.forEach((packet, i) => {
-    encodePacket(packet, supportsBinary as boolean, true, message => (results[i] = setLengthHeader(message)))
+    encodePacket(packet, supportsBinary as boolean, true, message => (results[i] = setLengthHeader(message as string | Buffer)))
   })
   callback(results.join(''))
 }
@@ -131,18 +112,18 @@ export function encodePayloadAsBinary(packets: Packet[], callback: EncodePacketC
   packets.forEach((packet, i) => {
     encodePacket(packet, true, true, packet => {
       const isBinary = typeof packet !== 'string'
-      const encodingLen = String(packet.length)
+      const encodingLen = String((packet as Buffer).length)
       const sizeBuffer = Buffer.alloc(encodingLen.length + 2)
       sizeBuffer[0] = +isBinary
       for (let i = 0; i < encodingLen.length; i++) sizeBuffer[i + 1] = parseInt(encodingLen[i], 10)
       sizeBuffer[sizeBuffer.length - 1] = 255
-      results[i] = Buffer.concat([sizeBuffer, isBinary ? packet : stringToBuffer(packet)])
+      results[i] = Buffer.concat([sizeBuffer, isBinary ? (packet as Buffer) : stringToBuffer(packet)])
     })
   })
   callback(Buffer.concat(results))
 }
 
-export function decodePayload(data: string | Buffer, binaryType?: any, callback: any = () => undefined) {
+export function decodePayload(data: string | Buffer, binaryType?: any, callback: any = () => {}) {
   if (typeof data !== 'string') return decodePayloadAsBinary(data, binaryType, callback)
   if (typeof binaryType === 'function') {
     callback = binaryType
@@ -232,10 +213,6 @@ function stringToBuffer(str: string) {
   return buffer
 }
 
-function setLengthHeader(message: string | Buffer) {
-  return `${message.length}:${message}`
-}
-
 function arrayBufferToBuffer(data: any) {
   const array = new Uint8Array(data.buffer || data)
   const length = data.byteLength || data.length
@@ -245,10 +222,4 @@ function arrayBufferToBuffer(data: any) {
     buffer[i] = array[offset + i]
   }
   return buffer
-}
-
-export interface Packet {
-  type: keyof typeof Packets
-  data?: any
-  options?: any
 }

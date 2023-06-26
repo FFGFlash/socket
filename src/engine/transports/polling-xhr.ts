@@ -1,6 +1,6 @@
 import EventEmitter from 'events'
 import Polling from './polling'
-import XMLHttpRequest from 'xmlhttprequest-ssl'
+var XMLHttpRequest = require('xmlhttprequest-ssl')
 
 export default class XHRTransport extends Polling {
   requestTimeout: any

@@ -1,6 +1,6 @@
 import Engine from './engine'
 import EventEmitter from 'events'
-import { Packet, decodePacket } from './parser'
+import { Packet, decodePacket } from './parser/parser'
 import { boundMethod } from 'autobind-decorator'
 
 export default abstract class Transport extends EventEmitter implements TransportOptions {

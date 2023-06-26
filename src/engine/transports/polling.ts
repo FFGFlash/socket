@@ -1,7 +1,7 @@
-import { encodeQuery } from 'src/shared/parseQuery'
-import { Packet, Packets, PacketsList, decodePayload, encodePayload } from '../parser'
+import { encodeQuery } from '../../shared/parseQuery'
+import { Packet, Packets, PacketsList, decodePayload, encodePayload } from '../parser/parser'
 import Transport, { ReadyState } from '../transport'
-import timestamp from 'src/shared/timestamp'
+import timestamp from '../../shared/timestamp'
 
 const hasXHR2 = (() => {
   const XMLHttpRequest = require('xmlhttprequest-ssl')
@@ -26,7 +26,7 @@ export default abstract class Polling extends Transport {
       this.writable = true
       this.emit('drain')
     }
-    encodePayload(packets, this.supportsBinary, data => this.doWrite(data, done))
+    encodePayload(packets, this.supportsBinary, data => this.doWrite(data as any, done))
   }
 
   doOpen() {

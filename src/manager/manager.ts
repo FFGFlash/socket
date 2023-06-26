@@ -1,12 +1,12 @@
 import EventEmitter from 'events'
-import BackOff from 'src/backoff/backoff'
-import { Decoder, Encoder, Packet, Types } from 'src/parser/parser'
-import on from 'src/shared/on'
+import BackOff from '../backoff/backoff'
+import { Decoder, Encoder, Packet, Types } from '../parser/parser'
+import on from '../shared/on'
 import DataError from './dataError'
 import { boundMethod } from 'autobind-decorator'
-import Socket, { SocketOptions } from 'src/socket/socket'
-import { indexOf } from 'src/shared/natives'
-import Engine from 'src/engine/engine'
+import Socket, { SocketOptions } from '../socket/socket'
+import { indexOf } from '../shared/natives'
+import Engine from '../engine/engine'
 
 export enum ReadyStates {
   OPEN = 'open',
@@ -47,7 +47,7 @@ export default class Manager extends EventEmitter {
   #reconnectionDelay!: number
   #reconnectionDelayMax!: number
   #randomizationFactor!: number
-  #timeout!: number | boolean
+  #timeout!: number | false
   open: this['connect']
   close: this['disconnect']
 
@@ -70,7 +70,7 @@ export default class Manager extends EventEmitter {
       options = uri
       uri = undefined
     }
-    options = this.options = Object.assign(Manager.DefaultOptions, options)
+    options = this.options = Object.assign(structuredClone(Manager.DefaultOptions), options)
     this.open = this.connect.bind(this)
     this.close = this.disconnect.bind(this)
     this.reconnection = this.options.reconnection !== false
@@ -137,7 +137,7 @@ export default class Manager extends EventEmitter {
         socket.close()
         socket.emit('error', 'timeout')
         this.emitAll('connect_timeout', timeout)
-      })
+      }, timeout)
       this.subs.push(() => clearTimeout(timer))
     }
 
@@ -226,12 +226,12 @@ export default class Manager extends EventEmitter {
     this.close()
   }
 
-  private async packet(packet: Packet) {
+  async packet(packet: Packet) {
     if (packet.query && packet.type === Types.CONNECT) packet.nsp += `?${packet.query}`
     if (!this.encoding) {
       this.encoding = true
       const packets = await this.encoder.encode(packet)
-      packets.forEach(data => this.engine!.write(data, packet))
+      packets.forEach(data => this.engine!.write(data, packet.options))
       this.encoding = false
       this.processPacketQueue()
     } else {

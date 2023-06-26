@@ -2,7 +2,7 @@ import JSONPTransport from './polling-jsonp'
 import XHRTransport from './polling-xhr'
 import WebsocketTransport from './websocket'
 
-const XMLHttpRequest = require('xmlhttprequest-ssl').XMLHttpRequest
+var XMLHttpRequest = require('xmlhttprequest-ssl')
 
 export function polling(options: any) {
   let xd = false

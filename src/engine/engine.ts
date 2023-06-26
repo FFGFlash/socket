@@ -1,7 +1,7 @@
 import EventEmitter from 'events'
-import { decodeQuery } from 'src/shared/parseQuery'
-import parseUri from 'src/shared/parseURI'
-import { Packet, Packets, PacketsList, Protocol } from './parser'
+import { decodeQuery } from '../shared/parseQuery'
+import parseUri from '../shared/parseURI'
+import { Packet, Packets, PacketsList, Protocol } from './parser/parser'
 import transports from './transports'
 import Transport from './transport'
 import { boundMethod } from 'autobind-decorator'
@@ -58,6 +58,7 @@ export default class Engine extends EventEmitter {
     this.write = this.send.bind(this)
 
     options = options || {}
+
     if (uri && typeof uri === 'object') {
       options = uri
       uri = undefined
@@ -73,12 +74,12 @@ export default class Engine extends EventEmitter {
       options.hostname = parseUri(options.host).host
     }
 
-    this.secure = options.secure != null ? options.secure : global.location && 'https:' === global.location.protocol
+    this.secure = options.secure != null ? options.secure : global.location && global.location.protocol === 'https:'
     if (options.hostname && !options.port) options.port = this.secure ? '443' : '80'
 
     this.agent = options.agent || false
     this.hostname = options.hostname || global.location?.hostname || 'localhost'
-    this.port = options.port || global.location?.port || this.secure ? '443' : '80'
+    this.port = options.port || global.location?.port || (this.secure ? '443' : '80')
     this.query = (typeof options.query === 'string' ? decodeQuery(options.query) : options.query) || {}
     this.upgrade = options.upgrade !== false
     this.path = (options.path || '/engine.io').replace(/\/$/, '') + '/'

@@ -120,12 +120,12 @@ function encodeAsString(obj: any) {
   }
 
   //* Immediately followed by the id
-  if (null !== obj.id) {
+  if (obj.id != null) {
     str += obj.id
   }
 
   //* Finally our json data
-  if (null !== obj.data) {
+  if (obj.data != null) {
     try {
       const payload = JSON.stringify(obj.data)
       str += payload

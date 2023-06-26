@@ -1,9 +1,9 @@
 import type ws from 'ws'
 import type { ErrorEvent } from 'ws'
-import { Packet, Packets, encodePacket } from '../parser'
+import { Packet, encodePacket } from '../parser/parser'
 import Transport from '../transport'
-import timestamp from 'src/shared/timestamp'
-import { encodeQuery } from 'src/shared/parseQuery'
+import timestamp from '../../shared/timestamp'
+import { encodeQuery } from '../../shared/parseQuery'
 
 const BrowserWebSocket = global.WebSocket
 let NodeWebSocket: typeof ws
@@ -48,14 +48,16 @@ export default class WebsocketTransport extends Transport {
           options = {}
           if (packet.options) options.compress = packet.options.compress
           if (this.perMessageDeflate) {
-            const len = typeof data === 'string' ? Buffer.byteLength(data) : data.length
+            const len = typeof data === 'string' ? Buffer.byteLength(data) : (data as Buffer).length
             if (len < this.perMessageDeflate.threshold) options.compress = false
           }
         }
 
+        console.log(data)
+
         try {
-          if (this.usingBrowserWebSocket) this.ws.send(data)
-          else this.ws.send(data, options)
+          if (this.usingBrowserWebSocket) this.ws.send(data as any)
+          else this.ws.send(data as any, options)
         } catch (e) {}
 
         --total || done()

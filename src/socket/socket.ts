@@ -3,7 +3,7 @@ import on from '../shared/on'
 import { boundMethod } from 'autobind-decorator'
 import { Packet, Types } from '../parser/parser'
 import hasBinary from './hasBinary'
-import { ReadyStates } from 'src/manager/manager'
+import Manager, { ReadyStates } from '../manager/manager'
 
 export enum Events {
   connect = 1,
@@ -26,7 +26,7 @@ export interface SocketOptions {
 }
 
 export default class Socket extends EventEmitter {
-  io: any
+  io: Manager
   nsp: string
   query?: string
   ids = 0
@@ -42,7 +42,7 @@ export default class Socket extends EventEmitter {
   flags?: any
   id?: number
 
-  constructor(io: any, nsp: string, opts: SocketOptions) {
+  constructor(io: Manager, nsp: string, opts: SocketOptions) {
     super()
     this.io = io
     this.nsp = nsp
@@ -78,7 +78,8 @@ export default class Socket extends EventEmitter {
     return this
   }
 
-  emit(event: string, ...data: any[]) {
+  emit(...data: [string, ...any]) {
+    const [event] = data
     if (Events.hasOwnProperty(event)) {
       return super.emit(event, ...data)
     }
@@ -90,7 +91,7 @@ export default class Socket extends EventEmitter {
       compress: !this.flags || false !== this.flags.compress,
     }
 
-    if ('function' === typeof data[data.length - 1]) {
+    if (typeof data[data.length - 1] === 'function') {
       this.acks[this.ids] = data.pop()
       packet.id = this.ids++
     }
@@ -200,7 +201,7 @@ export default class Socket extends EventEmitter {
       this.subs.forEach(destroy => destroy())
       delete this.subs
     }
-    this.io.destroy()
+    this.io.destroy(this)
   }
 
   get disconnected() {
