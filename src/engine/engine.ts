@@ -1,8 +1,10 @@
 import EventEmitter from 'events'
 import { decodeQuery } from 'src/shared/parseQuery'
 import parseUri from 'src/shared/parseURI'
-import { Protocol } from './parser'
+import { Packet, Packets, PacketsList, Protocol } from './parser'
 import transports from './transports'
+import Transport from './transport'
+import { boundMethod } from 'autobind-decorator'
 
 export default class Engine extends EventEmitter {
   secure: boolean
@@ -43,12 +45,18 @@ export default class Engine extends EventEmitter {
   pingTimeout?: any
   pingIntervalTimer?: any
   pingTimeoutTimer?: any
+  upgrading = false
+  write
+
+  #transport?: Transport
 
   static priorWebsocketSuccess = false
   static protocol = Protocol
 
   constructor(uri?: Partial<EngineOptions> | string, options?: Partial<EngineOptions>) {
     super()
+    this.write = this.send.bind(this)
+
     options = options || {}
     if (uri && typeof uri === 'object') {
       options = uri
@@ -149,11 +157,238 @@ export default class Engine extends EventEmitter {
   }
 
   open() {
-    throw new Error('Method not implemented.')
+    let transport
+    if (this.rememberUpgrade && Engine.priorWebsocketSuccess && this.transports.indexOf('websocket') !== '-1') {
+      transport = 'websocket'
+    } else if (this.transports.length === 0) {
+      setTimeout(() => {
+        this.emit('error', 'No transports available')
+      }, 0)
+      return
+    } else {
+      transport = this.transports[0]
+    }
+    this.readyState = ReadyState.OPENING
+
+    try {
+      transport = this.createTransport(transport)
+    } catch (e) {
+      this.transports.shift()
+      this.open()
+      return
+    }
+
+    transport.open()
+    this.transport = transport
+  }
+
+  probe(name: string) {}
+
+  @boundMethod
+  private onOpen() {
+    this.readyState = ReadyState.OPEN
+    Engine.priorWebsocketSuccess = this.transport?.name === 'websocket'
+    this.emit('open')
+    this.flush()
+
+    if (this.readyState !== ReadyState.OPEN || !this.upgrade || !this.transport || !('pause' in this.transport)) return
+    for (let i = 0, l = this.upgrades.length; i < l; i++) this.probe(this.upgrades[i])
+  }
+
+  @boundMethod
+  private onPacket(packet: Packet) {
+    if (this.readyState !== ReadyState.OPENING && this.readyState !== ReadyState.OPEN && this.readyState !== ReadyState.CLOSING) return
+    this.emit('packet', packet)
+    this.emit('heartbeat')
+    switch (packet.type as Packet['type'] | 'error') {
+      case PacketsList[Packets.open]:
+        this.onHandshake(JSON.parse(packet.data))
+        break
+      case PacketsList[Packets.pong]:
+        this.setPing()
+        this.emit('pong')
+        break
+      case 'error':
+        this.onError(new ServerError('server error', packet.data))
+        break
+      case PacketsList[Packets.message]:
+        this.emit('data', packet.data)
+        this.emit('message', packet.data)
+        break
+    }
+  }
+
+  private onHandshake(data: any) {
+    this.emit('handshake', data)
+    this.id = data.sid
+    this.transport!.query.sid = data.sid
+    this.upgrades = this.filterUpgrades(data.upgrades)
+    this.pingInterval = data.pingInterval
+    this.pingTimeout = data.pingTimeout
+    this.onOpen()
+    if (this.readyState === ReadyState.CLOSED) return
+    this.setPing()
+    this.removeListener('heartbeat', this.onHeartbeat)
+    this.on('heartbeat', this.onHeartbeat)
+  }
+
+  @boundMethod
+  private onHeartbeat(timeout?: number) {
+    clearTimeout(this.pingTimeoutTimer)
+    this.pingTimeoutTimer = setTimeout(() => {
+      if (this.readyState === ReadyState.CLOSED) return
+      this.onClose('ping timeout')
+    }, timeout || this.pingInterval + this.pingTimeout)
+  }
+
+  @boundMethod
+  private onError(err: any) {
+    Engine.priorWebsocketSuccess = false
+    this.emit('error', err)
+    this.onClose('transport error', err)
+  }
+
+  @boundMethod
+  private onDrain() {
+    this.writeBuffer.splice(0, this.prevBufferLen)
+    this.prevBufferLen = 0
+    if (this.writeBuffer.length === 0) this.emit('drain')
+    else this.flush()
+  }
+
+  private onClose(reason: string, desc?: any) {
+    if (this.readyState !== ReadyState.OPENING && this.readyState !== ReadyState.OPEN && this.readyState !== ReadyState.CLOSING) return
+
+    clearTimeout(this.pingIntervalTimer)
+    clearTimeout(this.pingTimeoutTimer)
+
+    this.transport?.removeAllListeners('close')
+    this.transport?.close()
+    this.transport?.removeAllListeners()
+    this.readyState = ReadyState.CLOSED
+    this.id = undefined
+    this.emit('close', reason, desc)
+    this.writeBuffer = []
+    this.prevBufferLen = 0
+  }
+
+  private filterUpgrades(upgrades: any[]) {
+    return upgrades.filter(upgrade => ~this.transports.indexOf(upgrade))
+  }
+
+  private setPing() {
+    clearTimeout(this.pingIntervalTimer)
+    this.pingIntervalTimer = setTimeout(() => {
+      this.ping()
+      this.onHeartbeat(this.pingTimeout)
+    }, this.pingInterval)
+  }
+
+  private ping() {
+    this.sendPacket('ping', () => this.emit('ping'))
+  }
+
+  private flush() {
+    if (this.readyState === ReadyState.CLOSED || !this.transport!.writable || this.upgrading || !this.writeBuffer.length) return
+    this.transport!.send(this.writeBuffer)
+    this.prevBufferLen = this.writeBuffer.length
+    this.emit('flush')
+  }
+
+  send(message?: string, options?: any, callback = () => {}) {
+    this.sendPacket('message', message, options, callback)
+    return this
+  }
+
+  sendPacket(type: Packet['type'], data?: any, options?: any, callback = () => {}) {
+    if (typeof data === 'function') {
+      callback = data
+      data = undefined
+    }
+
+    if (typeof options === 'function') {
+      callback = options
+      options = undefined
+    }
+
+    if (this.readyState === ReadyState.CLOSING || this.readyState === ReadyState.CLOSED) return
+
+    options = options || {}
+    options.compress = options.compress !== false
+    const packet = {
+      type,
+      data,
+      options,
+    }
+    this.emit('packetCreate', packet)
+    this.writeBuffer.push(packet)
+    if (callback) this.once('flush', callback)
+    this.flush()
+  }
+
+  get transport() {
+    return this.#transport
+  }
+
+  set transport(transport: Transport | undefined) {
+    if (this.#transport) this.#transport.removeAllListeners()
+    this.#transport = transport
+    if (!transport) return
+    transport
+      .on('drain', this.onDrain)
+      .on('packet', this.onPacket)
+      .on('error', this.onError)
+      .on('close', () => this.onClose('transport close'))
+  }
+
+  close() {
+    const close = () => {
+      this.onClose('forced close')
+      this.transport?.close()
+    }
+
+    const cleanupAndClose = () => {
+      this.removeListener('upgrade', cleanupAndClose)
+      this.removeListener('upgradeError', cleanupAndClose)
+      close()
+    }
+
+    const waitForUpgrade = () => {
+      this.once('upgrade', cleanupAndClose)
+      this.once('upgradeError', cleanupAndClose)
+    }
+
+    if (this.readyState === ReadyState.OPENING || this.readyState === ReadyState.OPEN) {
+      this.readyState = ReadyState.CLOSING
+      if (this.writeBuffer.length) {
+        this.once('drain', () => {
+          if (this.upgrading) waitForUpgrade()
+          else close()
+        })
+      } else if (this.upgrading) waitForUpgrade()
+      else close()
+    }
+
+    return this
   }
 }
 
-interface EngineOptions {
+export class ServerError extends Error {
+  code: any
+  constructor(message: string, code: any) {
+    super(message)
+    this.code = code
+  }
+}
+
+export enum ReadyState {
+  OPENING = 'opening',
+  OPEN = 'open',
+  CLOSING = 'closing',
+  CLOSED = 'closed',
+}
+
+export interface EngineOptions {
   host: string
   hostname: string
   secure: boolean
