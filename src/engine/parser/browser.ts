@@ -37,7 +37,6 @@ export function encodePacket(
   if (data && data.base64) return encodeBase64Object(packet, callback)
   let encoded = Packets[packet.type]
   if (packet.data !== undefined) encoded += utf8encode ? wtf8.encode(String(packet.data)) : String(packet.data)
-  console.log('~~', packet.data)
   return callback(String(encoded))
 }
 

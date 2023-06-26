@@ -53,8 +53,6 @@ export default class WebsocketTransport extends Transport {
           }
         }
 
-        console.log(data)
-
         try {
           if (this.usingBrowserWebSocket) this.ws.send(data as any)
           else this.ws.send(data as any, options)
