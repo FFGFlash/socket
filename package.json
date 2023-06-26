@@ -1,14 +1,25 @@
 {
   "name": "socket",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+  "description": "Implementation of Socket.io v1.7.4 without dependencies.",
+  "main": "build/index.js",
+  "types": "build/index.d.ts",
+  "repository": "github:FFGFlash/socket",
+  "bugs": {
+    "url": "https://github.com/FFGFlash/socket/issues"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "homepage": "https://github.com/FFGFlash/socket#readme",
+  "scripts": {
+    "prepack": "npm run build",
+    "prepublish": "npm run build",
+    "build": "npx tsc"
+  },
+  "keywords": [
+    "socket.io",
+    "legacy"
+  ],
+  "author": "Drake Taylor <taylorda2019@gmail.com>",
+  "license": "MIT",
   "devDependencies": {
     "@types/node": "^20.3.1",
     "@types/ws": "^8.5.5",

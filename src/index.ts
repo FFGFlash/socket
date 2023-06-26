@@ -33,7 +33,7 @@ function encodeQueryString(obj: Record<string, string>) {
   return str.join('&')
 }
 
-interface LookupOptions extends ManagerOptions {
+export interface LookupOptions extends ManagerOptions {
   forceNew: boolean
   ['force new connection']: boolean
   multiplex: boolean
@@ -43,3 +43,5 @@ interface LookupOptions extends ManagerOptions {
 export { io as connect, cache as managers }
 export { default as Manager } from './manager/manager'
 export { default as Socket } from './socket/socket'
+export { default as EngineSocket } from './engine/engine'
+export { default as Parser } from './parser/parser'

@@ -195,3 +195,8 @@ function decodeString(data: string) {
 function error(message: string): Packet {
   return { type: Types.ERROR, data: `parser error: ${message}` }
 }
+
+export default {
+  Encoder,
+  Decoder,
+}
