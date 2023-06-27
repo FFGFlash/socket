@@ -39,7 +39,6 @@
   },
   "browser": {
     "ws": false,
-    "xmlhttprequest-ssl": "./build/shim/xmlhttprequest.js",
-    "./parser/parser": "./build/engine/parser/browser.js"
+    "xmlhttprequest-ssl": "./build/shim/xmlhttprequest.js"
   }
 }
