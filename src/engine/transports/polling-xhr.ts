@@ -6,6 +6,8 @@ export default class XHRTransport extends Polling {
   requestTimeout: any
   xd?: boolean
   xs?: boolean
+  pollXhr?: Request
+  sendXhr?: Request
 
   constructor(options?: any) {
     super(options)
@@ -41,11 +43,18 @@ export default class XHRTransport extends Polling {
   }
 
   doPoll(): void {
-    throw new Error('Method not implemented.')
+    const req = this.request()
+    req.on('data', data => this.onData(data))
+    req.on('error', err => this.onError('xhr poll error', err))
+    this.pollXhr = req
   }
 
   doWrite(data: string | Buffer, done: () => void): void {
-    throw new Error('Method not implemented.')
+    const isBinary = typeof data !== 'string' && data !== undefined
+    const req = this.request({ method: 'POST', data, isBinary })
+    req.on('success', done)
+    req.on('error', err => this.onError('xhr post error', err))
+    this.sendXhr = req
   }
 }
 
