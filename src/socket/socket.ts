@@ -171,7 +171,7 @@ export default class Socket extends EventEmitter {
   }
 
   private onACK(packet: Packet) {
-    if (!packet.id) return
+    if (typeof packet.id === 'undefined') return
     const ack = this.acks[packet.id]
     if ('function' !== typeof ack) return
     ack.apply(this, packet.data)
