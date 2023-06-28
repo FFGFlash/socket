@@ -176,8 +176,8 @@ export function decodePayloadAsBinary(data: Buffer, binaryType: any, callback: a
     let strLen = ''
     let numTooLong = false
     const isString = bufferTail[0] === 0
-    let i = 1
-    while (i++) {
+    let i = 0
+    while (++i) {
       if (bufferTail[i] === 255) break
       if (strLen.length > 310) {
         numTooLong = true

@@ -255,49 +255,48 @@ export function encodePayloadAsBlob(packets: Packet[], callback: any = () => {})
   if (results.length) callback(new Blob!(results))
 }
 
-export function decodePayloadAsBinary(data: any, binaryType: any, callback: any = () => {}) {
+export function decodePayloadAsBinary(data: ArrayBuffer, binaryType: any, callback: any = () => {}) {
   if (typeof binaryType === 'function') {
     callback = binaryType
     binaryType = undefined
   }
 
   let bufferTail = data
-  const buffers: any[] = []
-  let numberTooLong = false
+  const buffers: string[] = []
 
-  while (bufferTail.length > 0) {
+  while (bufferTail.byteLength > 0) {
     const tailArray = new Uint8Array(bufferTail)
     const isString = tailArray[0] === 0
     let msgLength: string | number = ''
-    let i = 1
-    while (i++) {
+    let i = 0
+    while (++i) {
       if (tailArray[i] === 255) break
       if (msgLength.length > 310) {
-        numberTooLong = true
-        break
+        return callback(ErrorPacket, 0, 1)
       }
       msgLength += tailArray[i]
     }
+    console.log('~~', msgLength)
 
-    if (numberTooLong) return callback(ErrorPacket, 0, 1)
-
-    bufferTail = bufferTail.subarray(msgLength.length + 2)
+    bufferTail = bufferTail.slice(msgLength.length + 2)
     msgLength = parseInt(msgLength)
 
-    let msg = bufferTail.subarray(0, msgLength)
+    let msg: ArrayBuffer | string = bufferTail.slice(0, msgLength)
     if (isString) {
       try {
         msg = String.fromCharCode.apply(null, new Uint8Array(msg) as never as number[])
       } catch (e) {
-        const typed = new Uint8Array(msg)
+        const typed = new Uint8Array(msg as ArrayBuffer)
         msg = ''
         for (let i = 0; i < typed.length; i++) msg += String.fromCharCode(typed[i])
       }
     }
 
-    buffers.push(msg)
-    bufferTail = bufferTail.subarray(msgLength)
+    buffers.push(msg as string)
+    bufferTail = bufferTail.slice(msgLength)
   }
+
+  console.log('~~', buffers)
 
   const total = buffers.length
   buffers.forEach((buffer, i) => callback(decodePacket(buffer, binaryType, true), i, total))

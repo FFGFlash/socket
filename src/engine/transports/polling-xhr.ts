@@ -30,6 +30,7 @@ export default class XHRTransport extends Polling {
     options.agent = this.agent
     options.supportsBinary = this.supportsBinary
     options.enablesXDR = this.enablesXDR
+
     options.pfx = this.pfx
     options.key = this.key
     options.passphrase = this.passphrase
@@ -38,23 +39,23 @@ export default class XHRTransport extends Polling {
     options.ciphers = this.ciphers
     options.rejectUnauthorized = this.rejectUnauthorized
     options.requestTimeout = this.requestTimeout
+
     options.extraHeaders = this.extraHeaders
+
     return new Request(options)
   }
 
   doPoll(): void {
-    const req = this.request()
+    const req = (this.pollXhr = this.request())
     req.on('data', data => this.onData(data))
     req.on('error', err => this.onError('xhr poll error', err))
-    this.pollXhr = req
   }
 
   doWrite(data: string | Buffer, done: () => void): void {
     const isBinary = typeof data !== 'string' && data !== undefined
-    const req = this.request({ method: 'POST', data, isBinary })
+    const req = (this.sendXhr = this.request({ method: 'POST', data, isBinary }))
     req.on('success', done)
     req.on('error', err => this.onError('xhr post error', err))
-    this.sendXhr = req
   }
 }
 
@@ -201,7 +202,7 @@ class Request extends EventEmitter {
     try {
       let contentType
       try {
-        contentType = xhr.getResponseHeader('Content-Type')?.split(';')?.[0]
+        contentType = xhr.getResponseHeader('Content-Type')?.split(';')[0]
       } catch (e) {}
       if (contentType === 'application/octet-stream') {
         data = xhr.response || xhr.responseText

@@ -62,8 +62,10 @@ export default abstract class Polling extends Transport {
   }
 
   override onData(data: any) {
+    console.log('~~', data)
     const done = (packet: Packet, index: number, total: number) => {
-      if (this.readyState === ReadyState.OPEN) this.onOpen()
+      console.log('~~', packet, this.readyState)
+      if (this.readyState === ReadyState.OPENING) this.onOpen()
       if (packet.type === PacketsList[Packets.close]) {
         this.onClose()
         return false
@@ -75,7 +77,7 @@ export default abstract class Polling extends Transport {
     if (this.readyState === ReadyState.CLOSED) return
     this.polling = false
     this.emit('pollComplete')
-    if (this.readyState !== 'open') return
+    if (this.readyState !== ReadyState.OPEN) return
     this.poll()
   }
 

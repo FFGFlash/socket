@@ -1,7 +1,7 @@
 import hasCors from '../shared/hasCors'
 
-const xhr = window.XMLHttpRequest
-const xdr = (window as any).XDomainRequest
+const xhr = global.XMLHttpRequest
+const xdr = (global as any).XDomainRequest
 
 export default class XMLHttpRequest {
   constructor(options: any) {
