@@ -183,7 +183,86 @@ export default class Engine extends EventEmitter {
     this.transport = transport
   }
 
-  probe(name: string) {}
+  probe(name: keyof typeof transports) {
+    let transport: Transport | undefined = this.createTransport(name)
+    let failed = false
+
+    Engine.priorWebsocketSuccess = false
+
+    const onTransportOpen = () => {
+      if (!transport) return
+
+      if (this.onlyBinaryUpgrades) {
+        const upgradeLossesBinary = !transport.supportsBinary && this.transport!.supportsBinary
+        failed = failed || upgradeLossesBinary
+      }
+      if (failed) return
+
+      transport.send([{ type: 'ping', data: 'probe' }])
+      transport.once('packet', packet => {
+        if (failed) return
+        if (packet.type === PacketsList[Packets.pong] && packet.data === 'probe') {
+          this.upgrading = true
+          this.emit('upgrading', transport)
+          if (!transport) return
+          Engine.priorWebsocketSuccess = transport.name === 'websocket'
+          this.transport!.pause(() => {
+            if (failed || this.readyState === ReadyState.CLOSED || !transport) return
+            cleanup()
+            this.transport = transport
+            transport.send([{ type: PacketsList[Packets.upgrade] as 'upgrade' }])
+            this.emit('upgrade', transport)
+            transport = undefined
+            this.upgrading = false
+            this.flush()
+          })
+        } else {
+          const error = new ProbeError(transport?.name as keyof typeof transports)
+          this.emit('upgradeError', error)
+        }
+      })
+    }
+
+    const freezeTransport = () => {
+      if (failed) return
+      failed = true
+      cleanup()
+      transport?.close()
+      transport = undefined
+    }
+
+    const onError = (err: any) => {
+      const error = new ProbeError(transport?.name, err)
+      freezeTransport()
+      this.emit('upgradeError', error)
+    }
+
+    const onTransportClose = () => onError('transport closed')
+
+    const onClose = () => onError('socket closed')
+
+    const onUpgrade = (to: Transport) => {
+      if (transport && to.name !== transport.name) {
+        freezeTransport()
+      }
+    }
+
+    const cleanup = () => {
+      transport?.removeListener('open', onTransportOpen)
+      transport?.removeListener('error', onError)
+      transport?.removeListener('close', onTransportClose)
+      this.removeListener('close', onClose)
+      this.removeListener('upgrading', onUpgrade)
+    }
+
+    transport.once('open', onTransportOpen)
+    transport.once('error', onError)
+    transport.once('close', onTransportClose)
+    this.once('close', onClose)
+    this.once('upgrading', onUpgrade)
+
+    transport.open()
+  }
 
   @boundMethod
   private onOpen() {
@@ -375,10 +454,18 @@ export default class Engine extends EventEmitter {
 }
 
 export class ServerError extends Error {
-  code: any
+  code
   constructor(message: string, code: any) {
     super(message)
     this.code = code
+  }
+}
+
+export class ProbeError extends Error {
+  transport
+  constructor(transport?: string, err?: any) {
+    super('probe error' + err ? `: ${err}` : '')
+    this.transport = transport
   }
 }
 

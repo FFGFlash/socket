@@ -5,6 +5,7 @@ import { boundMethod } from 'autobind-decorator'
 
 export default abstract class Transport extends EventEmitter implements TransportOptions {
   abstract name: string
+  abstract supportsBinary: boolean
   agent
   path
   hostname
@@ -112,6 +113,7 @@ export default abstract class Transport extends EventEmitter implements Transpor
   abstract write(packets: Packet[]): any
   abstract doOpen(): any
   abstract doClose(): any
+  abstract pause(callback: () => void): void
 }
 
 export class TransportError extends Error {
