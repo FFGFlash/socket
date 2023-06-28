@@ -62,9 +62,7 @@ export default abstract class Polling extends Transport {
   }
 
   override onData(data: any) {
-    console.log('~~', data)
     const done = (packet: Packet, index: number, total: number) => {
-      console.log('~~', packet, this.readyState)
       if (this.readyState === ReadyState.OPENING) this.onOpen()
       if (packet.type === PacketsList[Packets.close]) {
         this.onClose()

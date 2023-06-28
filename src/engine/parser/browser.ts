@@ -276,7 +276,6 @@ export function decodePayloadAsBinary(data: ArrayBuffer, binaryType: any, callba
       }
       msgLength += tailArray[i]
     }
-    console.log('~~', msgLength)
 
     bufferTail = bufferTail.slice(msgLength.length + 2)
     msgLength = parseInt(msgLength)
@@ -295,8 +294,6 @@ export function decodePayloadAsBinary(data: ArrayBuffer, binaryType: any, callba
     buffers.push(msg as string)
     bufferTail = bufferTail.slice(msgLength)
   }
-
-  console.log('~~', buffers)
 
   const total = buffers.length
   buffers.forEach((buffer, i) => callback(decodePacket(buffer, binaryType, true), i, total))

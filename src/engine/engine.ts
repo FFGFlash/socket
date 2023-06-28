@@ -39,7 +39,7 @@ export default class Engine extends EventEmitter {
   forceNode: boolean
   extraHeaders: any
   localAddress: any
-  id?: number
+  id?: string
   upgrades?: any
   pingInterval?: any
   pingTimeout?: any

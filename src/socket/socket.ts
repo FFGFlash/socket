@@ -40,7 +40,7 @@ export default class Socket extends EventEmitter {
   send: (...args: any[]) => boolean
   subs?: Array<() => void>
   flags?: any
-  id?: number
+  id?: string
 
   constructor(io: Manager, nsp: string, opts: SocketOptions) {
     super()
