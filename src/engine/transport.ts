@@ -114,7 +114,7 @@ export default abstract class Transport extends EventEmitter implements Transpor
   abstract doOpen(): any
   abstract doClose(): any
 
-  pause?(callback: () => void): void
+  abstract pause?(callback: () => void): void
 }
 
 export class TransportError extends Error {
