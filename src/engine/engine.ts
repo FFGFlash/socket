@@ -206,7 +206,7 @@ export default class Engine extends EventEmitter {
           this.emit('upgrading', transport)
           if (!transport) return
           Engine.priorWebsocketSuccess = transport.name === 'websocket'
-          this.transport!.pause(() => {
+          this.transport?.pause?.(() => {
             if (failed || this.readyState === ReadyState.CLOSED || !transport) return
             cleanup()
             this.transport = transport
