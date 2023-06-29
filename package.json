@@ -1,7 +1,7 @@
 {
   "name": "@ffgflash/socket-client",
   "private": false,
-  "version": "3.0.1",
+  "version": "3.0.2",
   "description": "Implementation of Socket.io v1.7.4 without dependencies.",
   "main": "build/index.js",
   "types": "build/index.d.ts",
