@@ -4,6 +4,9 @@ import { boundMethod } from 'autobind-decorator'
 import { Packet, Types } from '../parser/parser'
 import hasBinary from './hasBinary'
 import Manager, { ReadyStates } from '../manager/manager'
+import debug from 'debug'
+
+const info = debug('socket-client:socket')
 
 export enum Events {
   connect = 1,
@@ -72,7 +75,10 @@ export default class Socket extends EventEmitter {
   }
 
   disconnect() {
-    if (this.connected) this.packet({ type: Types.DISCONNECT })
+    if (this.connected) {
+      info('performing disconnect (%s)', this.nsp)
+      this.packet({ type: Types.DISCONNECT })
+    }
     this.destroy()
     if (this.connected) this.onClose('io client disconnect')
     return this
@@ -92,6 +98,7 @@ export default class Socket extends EventEmitter {
     }
 
     if (typeof data[data.length - 1] === 'function') {
+      info('emitting packet with ack id %d', this.ids)
       this.acks[this.ids] = data.pop()
       packet.id = this.ids++
     }
@@ -116,14 +123,17 @@ export default class Socket extends EventEmitter {
 
   @boundMethod
   private onOpen() {
+    info('transport is open - connecting')
     if ('/' !== this.nsp) {
-      if (this.query) this.packet({ type: Types.CONNECT, query: this.query })
-      else this.packet({ type: Types.CONNECT })
+      const packet: Packet = { type: Types.CONNECT }
+      if (this.query) packet.query = this.query
+      this.packet(packet)
     }
   }
 
   @boundMethod
   private onClose(reason: string) {
+    info('close (%s)', reason)
     this.connected = false
     delete this.id
     this.emit('disconnect', reason)
@@ -155,7 +165,13 @@ export default class Socket extends EventEmitter {
 
   private onEvent(packet: Packet) {
     const args = packet.data || []
-    if (null != packet.id) args.push(this.ack(packet.id))
+    info('emitting event %j', args)
+
+    if (null != packet.id) {
+      info('attaching ack callback to event')
+      args.push(this.ack(packet.id))
+    }
+
     if (this.connected) super.emit.apply(this, args)
     else this.receiveBuffer.push(args)
   }
@@ -165,6 +181,7 @@ export default class Socket extends EventEmitter {
     return (...data: any[]) => {
       if (sent) return
       sent = true
+      info('sending ack %j', data)
       const type = hasBinary(data) ? Types.BINARY_ACK : Types.ACK
       this.packet({ type, id, data })
     }
@@ -173,7 +190,8 @@ export default class Socket extends EventEmitter {
   private onACK(packet: Packet) {
     if (typeof packet.id === 'undefined') return
     const ack = this.acks[packet.id]
-    if ('function' !== typeof ack) return
+    if ('function' !== typeof ack) return info('bad ack %s', packet.id)
+    info('calling ack %s with %j', packet.id, packet.data)
     ack.apply(this, packet.data)
     delete this.acks[packet.id]
   }
@@ -192,6 +210,7 @@ export default class Socket extends EventEmitter {
   }
 
   private onDisconnect() {
+    info('server disconnect (%s)', this.nsp)
     this.destroy()
     this.onClose('io server disconnect')
   }

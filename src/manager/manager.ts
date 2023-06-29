@@ -7,6 +7,9 @@ import { boundMethod } from 'autobind-decorator'
 import Socket, { SocketOptions } from '../socket/socket'
 import { indexOf } from '../shared/natives'
 import Engine from '../engine/engine'
+import debug from 'debug'
+
+const info = debug('socket-client:manager')
 
 export enum ReadyStates {
   OPEN = 'open',
@@ -111,7 +114,10 @@ export default class Manager extends EventEmitter {
   }
 
   connect(callback?: (err?: DataError) => void) {
+    info('readyState %s', this.readyState)
     if (~this.readyState.indexOf('open')) return this
+
+    info('opening %s', this.uri)
     this.engine = new Engine(this.uri, this.options)
     const socket = this.engine
     this.readyState = ReadyStates.OPENING
@@ -123,6 +129,7 @@ export default class Manager extends EventEmitter {
     })
 
     const disconnectErrorSub = on(socket, 'error', (data: any) => {
+      info('connect_error')
       this.cleanup()
       this.readyState = ReadyStates.CLOSED
       this.emitAll('connect_error', data)
@@ -132,12 +139,16 @@ export default class Manager extends EventEmitter {
 
     if (false !== this.timeout) {
       const timeout = this.timeout
+      info('connect attempt will timeout after %dms', timeout)
+
       const timer = setTimeout(() => {
+        info('connect attempt timed out after %dms', timeout)
         disconnectOpenSub()
         socket.close()
         socket.emit('error', 'timeout')
         this.emitAll('connect_timeout', timeout)
       }, timeout)
+
       this.subs.push(() => clearTimeout(timer))
     }
 
@@ -148,6 +159,7 @@ export default class Manager extends EventEmitter {
   }
 
   private onOpen() {
+    info('open')
     this.cleanup()
     this.readyState = ReadyStates.OPEN
     this.emit('open')
@@ -185,11 +197,13 @@ export default class Manager extends EventEmitter {
 
   @boundMethod
   private onError(err: Error) {
+    info('error', err)
     this.emitAll('error', err)
   }
 
   @boundMethod
   private onClose(reason: string) {
+    info('onClose')
     this.cleanup()
     this.backOff.reset()
     this.readyState = ReadyStates.CLOSED
@@ -229,6 +243,7 @@ export default class Manager extends EventEmitter {
   }
 
   async packet(packet: Packet) {
+    info('writing packet %j', packet)
     if (packet.query && packet.type === Types.CONNECT) packet.nsp += `?${packet.query}`
     if (!this.encoding) {
       this.encoding = true
@@ -248,6 +263,7 @@ export default class Manager extends EventEmitter {
   }
 
   private cleanup() {
+    info('cleanup')
     this.subs.forEach(destroy => destroy())
     this.subs = []
     this.packetBuffer = []
@@ -257,6 +273,7 @@ export default class Manager extends EventEmitter {
   }
 
   disconnect() {
+    info('disconnect')
     this.skipReconnect = true
     this.reconnecting = false
     if (ReadyStates.OPENING === this.readyState) this.cleanup()
@@ -268,30 +285,37 @@ export default class Manager extends EventEmitter {
   reconnect() {
     if (this.reconnecting || this.skipReconnect) return this
     if (this.backOff.attempts >= this.reconnectionAttempts) {
+      info('reconnect failed')
       this.backOff.reset()
       this.emitAll('reconnect_failed')
       this.reconnecting = false
       return this
     }
+
     const delay = this.backOff.duration
+    info('will wait %dms before reconnect attempt', delay)
     this.reconnecting = true
     const timer = setTimeout(() => {
       if (this.skipReconnect) return
+      info('attempting reconnect')
       this.emitAll('reconnect_attempt', this.backOff.attempts)
       this.emitAll('reconnecting', this.backOff.attempts)
       if (this.skipReconnect) return
       this.open(err => {
         if (err) {
+          info('reconnect attempt error')
           this.reconnecting = false
           this.reconnect()
           this.emitAll('reconnect_error', err.data)
         } else {
+          info('reconnect success')
           this.onReconnect()
         }
       })
     }, delay)
 
     this.subs.push(() => clearTimeout(timer))
+    return this
   }
 
   get reconnection() {

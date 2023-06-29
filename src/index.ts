@@ -1,5 +1,8 @@
+import debug from 'debug'
 import Manager, { ManagerOptions } from './manager/manager'
 import url from './shared/url'
+
+const info = debug('socket-client')
 
 export const cache: Record<string, Manager> = {}
 
@@ -15,8 +18,13 @@ export default function io(uri?: Partial<LookupOptions> | string, options: Parti
 
   let io: Manager
 
-  if (newConnection) io = new Manager(source, options)
-  else io = cache[id] = cache[id] || new Manager(source, options)
+  if (newConnection) {
+    info('ignoring socket cache for %s', source)
+    io = new Manager(source, options)
+  } else {
+    if (!cache[id]) info('new io instance for %s', source)
+    io = cache[id] = cache[id] || new Manager(source, options)
+  }
 
   options.query ??= query
 

@@ -1,6 +1,9 @@
 import EventEmitter from 'events'
 import Polling from './polling'
+import debug from 'debug'
 var XMLHttpRequest = require('xmlhttprequest-ssl')
+
+const info = debug('engine-client:polling-xhr')
 
 export default class XHRTransport extends Polling {
   requestTimeout: any
@@ -46,6 +49,7 @@ export default class XHRTransport extends Polling {
   }
 
   doPoll(): void {
+    info('xhr poll')
     const req = (this.pollXhr = this.request())
     req.on('data', data => this.onData(data))
     req.on('error', err => this.onError('xhr poll error', err))
@@ -129,6 +133,7 @@ class Request extends EventEmitter {
     const xhr = (this.xhr = new XMLHttpRequest(options))
 
     try {
+      info('xhr open %s: %s', this.method, this.uri)
       xhr.open(this.method, this.uri, this.async)
 
       try {
@@ -170,6 +175,7 @@ class Request extends EventEmitter {
         }
       }
 
+      info('xhr data %s', this.data)
       xhr.send(this.data)
     } catch (e) {
       setTimeout(() => this.onError(e), 0)

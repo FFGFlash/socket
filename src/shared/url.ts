@@ -1,4 +1,7 @@
+import debug from 'debug'
 import parseUri, { ParsedURI } from './parseURI'
+
+const info = debug('socket-client:url')
 
 export default function url(uri: string | ParsedURI, location = global.window.location) {
   let obj: any
@@ -6,7 +9,11 @@ export default function url(uri: string | ParsedURI, location = global.window.lo
 
   if ('string' === typeof uri) {
     if ('/' === uri.charAt(0)) uri = `${'/' === uri.charAt(1) ? global.location.protocol : global.location.host}${uri}`
-    if (!ProtocolRegex.test(uri)) uri = `${'undefined' !== typeof global.location ? global.location.protocol : 'https:'}//${uri}`
+    if (!ProtocolRegex.test(uri)) {
+      info('protocol-less url %s', uri)
+      uri = `${'undefined' !== typeof global.location ? global.location.protocol : 'https:'}//${uri}`
+    }
+    info('parse %s', uri)
     obj = parseUri(uri)
   } else obj = uri
 

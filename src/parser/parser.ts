@@ -1,6 +1,9 @@
 import EventEmitter from 'events'
 import { deconstructPacket, reconstructPacket, removeBlobs } from './binary'
 import { isBuffer } from '../shared/natives'
+import debug from 'debug'
+
+const info = debug('socket-client:parser')
 
 export interface Packet {
   type: Types
@@ -30,6 +33,7 @@ export const ERROR_PACKET = `${Types.ERROR}"encode error"`
 
 export class Encoder {
   async encode(obj: any) {
+    info('encoding packet %j', obj)
     switch (obj.type) {
       case Types.BINARY_EVENT:
       case Types.BINARY_ACK:
@@ -134,6 +138,7 @@ function encodeAsString(obj: any) {
     }
   }
 
+  info('encoded %j as %s', obj, str)
   return str
 }
 
@@ -189,6 +194,7 @@ function decodeString(data: string) {
     }
   }
 
+  info('decoded %s as %j', data, packet)
   return packet as Packet
 }
 

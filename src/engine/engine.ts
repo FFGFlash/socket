@@ -5,6 +5,9 @@ import { Packet, Packets, PacketsList, Protocol } from './parser/parser'
 import transports from './transports'
 import Transport from './transport'
 import { boundMethod } from 'autobind-decorator'
+import debug from 'debug'
+
+const info = debug('engine-client:socket')
 
 export default class Engine extends EventEmitter {
   secure: boolean
@@ -40,7 +43,7 @@ export default class Engine extends EventEmitter {
   extraHeaders: any
   localAddress: any
   id?: string
-  upgrades?: any
+  upgrades?: (keyof typeof transports)[]
   pingInterval?: any
   pingTimeout?: any
   pingIntervalTimer?: any
@@ -124,6 +127,7 @@ export default class Engine extends EventEmitter {
   }
 
   createTransport(name: keyof typeof transports) {
+    info('creating transport "%s"', name)
     const query = structuredClone(this.query)
     query.EIO = Protocol
     query.transport = name
@@ -184,6 +188,7 @@ export default class Engine extends EventEmitter {
   }
 
   probe(name: keyof typeof transports) {
+    info('probing transport "%s"', name)
     let transport: Transport | undefined = this.createTransport(name)
     let failed = false
 
@@ -198,16 +203,21 @@ export default class Engine extends EventEmitter {
       }
       if (failed) return
 
+      info('probe transport "%s" opened', name)
       transport.send([{ type: 'ping', data: 'probe' }])
       transport.once('packet', packet => {
         if (failed) return
         if (packet.type === PacketsList[Packets.pong] && packet.data === 'probe') {
+          info('probe transport "%s" pong', name)
           this.upgrading = true
           this.emit('upgrading', transport)
           if (!transport) return
           Engine.priorWebsocketSuccess = transport.name === 'websocket'
-          this.transport?.pause?.(() => {
+
+          info('pausing current transport "%s"', this.transport.name)
+          this.transport.pause!(() => {
             if (failed || this.readyState === ReadyState.CLOSED || !transport) return
+            info('changing transport and sending upgrade packet')
             cleanup()
             this.transport = transport
             transport.send([{ type: PacketsList[Packets.upgrade] as 'upgrade' }])
@@ -217,6 +227,7 @@ export default class Engine extends EventEmitter {
             this.flush()
           })
         } else {
+          info('probe transport "%s" failed', name)
           const error = new ProbeError(transport?.name as keyof typeof transports)
           this.emit('upgradeError', error)
         }
@@ -234,6 +245,7 @@ export default class Engine extends EventEmitter {
     const onError = (err: any) => {
       const error = new ProbeError(transport?.name, err)
       freezeTransport()
+      info('probe transport "%s" failed because of error: %s', name, err)
       this.emit('upgradeError', error)
     }
 
@@ -243,6 +255,7 @@ export default class Engine extends EventEmitter {
 
     const onUpgrade = (to: Transport) => {
       if (transport && to.name !== transport.name) {
+        info('"%s" works - aborting "%s"', to.name, transport.name)
         freezeTransport()
       }
     }
@@ -266,18 +279,22 @@ export default class Engine extends EventEmitter {
 
   @boundMethod
   private onOpen() {
+    info('socket open')
     this.readyState = ReadyState.OPEN
     Engine.priorWebsocketSuccess = this.transport?.name === 'websocket'
     this.emit('open')
     this.flush()
 
-    if (this.readyState !== ReadyState.OPEN || !this.upgrade || !this.transport || !('pause' in this.transport)) return
-    for (let i = 0, l = this.upgrades.length; i < l; i++) this.probe(this.upgrades[i])
+    if (this.readyState !== ReadyState.OPEN || !this.upgrade || !this.transport.pause) return
+    info('starting upgrade probes')
+    this.upgrades?.forEach(upgrade => this.probe(upgrade))
   }
 
   @boundMethod
   private onPacket(packet: Packet) {
-    if (this.readyState !== ReadyState.OPENING && this.readyState !== ReadyState.OPEN && this.readyState !== ReadyState.CLOSING) return
+    if (this.readyState !== ReadyState.OPENING && this.readyState !== ReadyState.OPEN && this.readyState !== ReadyState.CLOSING)
+      return info('packet received with socket readyState "%s"', this.readyState)
+    info('socket receive: type "%s", data "%s"', packet.type, packet.data)
     this.emit('packet', packet)
     this.emit('heartbeat')
     switch (packet.type as Packet['type'] | 'error') {
@@ -323,6 +340,7 @@ export default class Engine extends EventEmitter {
 
   @boundMethod
   private onError(err: any) {
+    info('socket error %j', err)
     Engine.priorWebsocketSuccess = false
     this.emit('error', err)
     this.onClose('transport error', err)
@@ -338,6 +356,7 @@ export default class Engine extends EventEmitter {
 
   private onClose(reason: string, desc?: any) {
     if (this.readyState !== ReadyState.OPENING && this.readyState !== ReadyState.OPEN && this.readyState !== ReadyState.CLOSING) return
+    info('socket close with reason: "%s"', reason)
 
     clearTimeout(this.pingIntervalTimer)
     clearTimeout(this.pingTimeoutTimer)
@@ -359,6 +378,7 @@ export default class Engine extends EventEmitter {
   private setPing() {
     clearTimeout(this.pingIntervalTimer)
     this.pingIntervalTimer = setTimeout(() => {
+      info('writing ping packet - expecting pong within %sms', this.pingTimeout)
       this.ping()
       this.onHeartbeat(this.pingTimeout)
     }, this.pingInterval)
@@ -370,6 +390,7 @@ export default class Engine extends EventEmitter {
 
   private flush() {
     if (this.readyState === ReadyState.CLOSED || !this.transport!.writable || this.upgrading || !this.writeBuffer.length) return
+    info('flushing %d packets in socket', this.writeBuffer.length)
     this.transport!.send(this.writeBuffer)
     this.prevBufferLen = this.writeBuffer.length
     this.emit('flush')
@@ -407,13 +428,16 @@ export default class Engine extends EventEmitter {
   }
 
   get transport() {
-    return this.#transport
+    return this.#transport!
   }
 
-  set transport(transport: Transport | undefined) {
-    if (this.#transport) this.#transport.removeAllListeners()
+  set transport(transport: Transport) {
+    info('setting transport %s', transport.name)
+    if (this.#transport) {
+      info('clearing existing transport %s', this.transport.name)
+      this.#transport.removeAllListeners()
+    }
     this.#transport = transport
-    if (!transport) return
     transport
       .on('drain', this.onDrain)
       .on('packet', this.onPacket)
@@ -424,6 +448,7 @@ export default class Engine extends EventEmitter {
   close() {
     const close = () => {
       this.onClose('forced close')
+      info('socket closing - telling transport to close')
       this.transport?.close()
     }
 

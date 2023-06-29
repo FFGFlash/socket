@@ -4,6 +4,9 @@ import { Packet, encodePacket } from '../parser/parser'
 import Transport from '../transport'
 import timestamp from '../../shared/timestamp'
 import { encodeQuery } from '../../shared/parseQuery'
+import debug from 'debug'
+
+const info = debug('engine-client:websocket')
 
 const BrowserWebSocket = global.WebSocket
 let NodeWebSocket: typeof ws
@@ -56,7 +59,9 @@ export default class WebsocketTransport extends Transport {
         try {
           if (this.usingBrowserWebSocket) this.ws.send(data as any)
           else this.ws.send(data as any, options)
-        } catch (e) {}
+        } catch (e) {
+          info('websocket closed before onClose event')
+        }
 
         --total || done()
       })
