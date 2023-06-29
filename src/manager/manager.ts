@@ -168,7 +168,9 @@ export default class Manager extends EventEmitter {
 
   @boundMethod
   private onPong() {
-    this.emitAll('pong', new Date().valueOf() - (this.lastPing as Date).valueOf())
+    let pong = new Date().valueOf()
+    if (this.lastPing instanceof Date) pong -= this.lastPing.valueOf()
+    this.emitAll('pong', pong)
   }
 
   @boundMethod
