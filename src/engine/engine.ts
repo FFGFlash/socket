@@ -9,6 +9,8 @@ import debug from 'debug'
 
 const info = debug('engine-client:socket')
 
+export type Transports = keyof typeof transports
+
 export default class Engine extends EventEmitter {
   secure: boolean
   agent: boolean
@@ -23,7 +25,7 @@ export default class Engine extends EventEmitter {
   enablesXDR: boolean
   timestampParam: any
   timestampRequests: any
-  transports: any
+  transports: Transports[]
   readyState: string
   writeBuffer: any[]
   prevBufferLen: number
@@ -43,7 +45,7 @@ export default class Engine extends EventEmitter {
   extraHeaders: any
   localAddress: any
   id?: string
-  upgrades?: (keyof typeof transports)[]
+  upgrades?: Transports[]
   pingInterval?: any
   pingTimeout?: any
   pingIntervalTimer?: any
@@ -126,7 +128,7 @@ export default class Engine extends EventEmitter {
     this.open()
   }
 
-  createTransport(name: keyof typeof transports) {
+  createTransport(name: Transports) {
     info('creating transport "%s"', name)
     const query = structuredClone(this.query)
     query.EIO = Protocol
@@ -163,12 +165,10 @@ export default class Engine extends EventEmitter {
 
   open() {
     let transport
-    if (this.rememberUpgrade && Engine.priorWebsocketSuccess && this.transports.indexOf('websocket') !== '-1') {
+    if (this.rememberUpgrade && Engine.priorWebsocketSuccess && this.transports.indexOf('websocket') !== -1) {
       transport = 'websocket'
     } else if (this.transports.length === 0) {
-      setTimeout(() => {
-        this.emit('error', 'No transports available')
-      }, 0)
+      setTimeout(() => this.emit('error', 'No transports available'), 0)
       return
     } else {
       transport = this.transports[0]
@@ -176,7 +176,7 @@ export default class Engine extends EventEmitter {
     this.readyState = ReadyState.OPENING
 
     try {
-      transport = this.createTransport(transport)
+      transport = this.createTransport(transport as Transports)
     } catch (e) {
       this.transports.shift()
       this.open()
@@ -187,7 +187,7 @@ export default class Engine extends EventEmitter {
     this.transport = transport
   }
 
-  probe(name: keyof typeof transports) {
+  probe(name: Transports) {
     info('probing transport "%s"', name)
     let transport: Transport | undefined = this.createTransport(name)
     let failed = false
@@ -220,7 +220,7 @@ export default class Engine extends EventEmitter {
             info('changing transport and sending upgrade packet')
             cleanup()
             this.transport = transport
-            transport.send([{ type: PacketsList[Packets.upgrade] as 'upgrade' }])
+            transport.send([{ type: 'upgrade' }])
             this.emit('upgrade', transport)
             transport = undefined
             this.upgrading = false
@@ -228,7 +228,7 @@ export default class Engine extends EventEmitter {
           })
         } else {
           info('probe transport "%s" failed', name)
-          const error = new ProbeError(transport?.name as keyof typeof transports)
+          const error = new ProbeError(transport?.name as Transports)
           this.emit('upgradeError', error)
         }
       })
@@ -361,9 +361,9 @@ export default class Engine extends EventEmitter {
     clearTimeout(this.pingIntervalTimer)
     clearTimeout(this.pingTimeoutTimer)
 
-    this.transport?.removeAllListeners('close')
-    this.transport?.close()
-    this.transport?.removeAllListeners()
+    this.transport.removeAllListeners('close')
+    this.transport.close()
+    this.transport.removeAllListeners()
     this.readyState = ReadyState.CLOSED
     this.id = undefined
     this.emit('close', reason, desc)
@@ -442,11 +442,17 @@ export default class Engine extends EventEmitter {
       .on('drain', this.onDrain)
       .on('packet', this.onPacket)
       .on('error', this.onError)
-      .on('close', () => this.onClose('transport close'))
+      .on('close', () => {
+        const err = new Error()
+        info('Test: %j', err.stack)
+        this.onClose('transport close')
+      })
   }
 
   close() {
-    const close = () => {
+    if (this.readyState !== ReadyState.OPEN && this.readyState !== ReadyState.OPENING) return this
+
+    const done = () => {
       this.onClose('forced close')
       info('socket closing - telling transport to close')
       this.transport?.close()
@@ -455,7 +461,7 @@ export default class Engine extends EventEmitter {
     const cleanupAndClose = () => {
       this.removeListener('upgrade', cleanupAndClose)
       this.removeListener('upgradeError', cleanupAndClose)
-      close()
+      done()
     }
 
     const waitForUpgrade = () => {
@@ -463,17 +469,14 @@ export default class Engine extends EventEmitter {
       this.once('upgradeError', cleanupAndClose)
     }
 
-    if (this.readyState === ReadyState.OPENING || this.readyState === ReadyState.OPEN) {
-      this.readyState = ReadyState.CLOSING
-      if (this.writeBuffer.length) {
-        this.once('drain', () => {
-          if (this.upgrading) waitForUpgrade()
-          else close()
-        })
-      } else if (this.upgrading) waitForUpgrade()
-      else close()
+    const close = () => {
+      if (this.writeBuffer.length) return this.once('drain', close)
+      if (this.upgrading) return waitForUpgrade()
+      done()
     }
 
+    this.readyState = ReadyState.CLOSING
+    close()
     return this
   }
 }

@@ -3,6 +3,9 @@ import { isAndroid, isPhantom, withNativeArrayBuffer, withNativeBlob } from '../
 import { Packets, PacketsList, ErrorPacket, Packet, EncodePacketCallback, setLengthHeader } from './shared'
 import Blob from '../../shared/blob'
 import hasBinary from '../../socket/hasBinary'
+import debug from 'debug'
+
+const info = debug('engine-client:parser')
 
 let base64Encoder: any
 if (global && global.ArrayBuffer) {
@@ -37,6 +40,7 @@ export function encodePacket(
   if (data && data.base64) return encodeBase64Object(packet, callback)
   let encoded = Packets[packet.type]
   if (packet.data !== undefined) encoded += utf8encode ? wtf8.encode(String(packet.data)) : String(packet.data)
+  info('Encoded %j as %s', packet, encoded)
   return callback(String(encoded))
 }
 

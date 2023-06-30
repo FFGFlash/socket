@@ -2,6 +2,9 @@ import Engine from './engine'
 import EventEmitter from 'events'
 import { Packet, decodePacket } from './parser/parser'
 import { boundMethod } from 'autobind-decorator'
+import debug from 'debug'
+
+const info = debug('engine-client:transport')
 
 export default abstract class Transport extends EventEmitter implements TransportOptions {
   abstract name: string
@@ -92,7 +95,7 @@ export default abstract class Transport extends EventEmitter implements Transpor
   }
 
   open() {
-    if (this.readyState !== ReadyState.CLOSED && (this.readyState as string) !== '') return this
+    if (this.readyState !== ReadyState.CLOSED) return this
     this.readyState = ReadyState.OPENING
     this.doOpen()
     return this
@@ -106,6 +109,7 @@ export default abstract class Transport extends EventEmitter implements Transpor
   }
 
   send(packets: Packet[]) {
+    info('Sending packets %j', packets)
     if (this.readyState !== ReadyState.OPEN) throw new Error('Transport not open')
     this.write(packets)
   }
