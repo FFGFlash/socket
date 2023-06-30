@@ -180,7 +180,7 @@ function decodeString(data: string) {
   if ('' !== next && !isNaN(Number(next))) {
     const start = i + 1
     while ((next = data.charAt(i + 1)) !== null && !isNaN(Number(next)) && ++i !== data.length) {}
-    packet.id = Number(data.substring(start, i))
+    packet.id = Number(data.substring(start, i + 1))
   }
 
   if (data.charAt(++i)) {
