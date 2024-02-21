@@ -1,13 +1,13 @@
-import EventEmitter from 'events'
-import BackOff from '../backoff/backoff'
-import { Decoder, Encoder, Packet, Types } from '../parser/parser'
-import on from '../shared/on'
-import DataError from './dataError'
 import { boundMethod } from 'autobind-decorator'
-import Socket, { SocketOptions } from '../socket/socket'
-import { indexOf } from '../shared/natives'
-import Engine from '../engine/engine'
 import debug from 'debug'
+import EventEmitter from 'eventemitter3'
+import BackOff from '../backoff/backoff'
+import Engine from '../engine/engine'
+import { Decoder, Encoder, Packet, Types } from '../parser/parser'
+import { indexOf } from '../shared/natives'
+import on from '../shared/on'
+import Socket, { SocketOptions } from '../socket/socket'
+import DataError from './dataError'
 
 const info = debug('socket-client:manager')
 

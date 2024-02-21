@@ -1,8 +1,8 @@
-import Engine from './engine'
-import EventEmitter from 'events'
-import { Packet, decodePacket } from './parser/parser'
 import { boundMethod } from 'autobind-decorator'
 import debug from 'debug'
+import EventEmitter from 'eventemitter3'
+import Engine from './engine'
+import { Packet, decodePacket } from './parser/parser'
 
 const info = debug('engine-client:transport')
 

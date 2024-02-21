@@ -1,6 +1,6 @@
-import EventEmitter from 'events'
-import Polling from './polling'
 import debug from 'debug'
+import EventEmitter from 'eventemitter3'
+import Polling from './polling'
 var XMLHttpRequest = require('xmlhttprequest-ssl')
 
 const info = debug('engine-client:polling-xhr')

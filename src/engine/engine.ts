@@ -1,11 +1,11 @@
-import EventEmitter from 'events'
+import { boundMethod } from 'autobind-decorator'
+import debug from 'debug'
+import EventEmitter from 'eventemitter3'
 import { decodeQuery } from '../shared/parseQuery'
 import parseUri from '../shared/parseURI'
 import { Packet, Packets, PacketsList, Protocol } from './parser/parser'
-import transports from './transports'
 import Transport from './transport'
-import { boundMethod } from 'autobind-decorator'
-import debug from 'debug'
+import transports from './transports'
 
 const info = debug('engine-client:socket')
 

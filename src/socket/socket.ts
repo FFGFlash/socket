@@ -1,10 +1,10 @@
-import EventEmitter from 'events'
-import on from '../shared/on'
 import { boundMethod } from 'autobind-decorator'
-import { Packet, Types } from '../parser/parser'
-import hasBinary from './hasBinary'
-import Manager, { ReadyStates } from '../manager/manager'
 import debug from 'debug'
+import EventEmitter from 'eventemitter3'
+import Manager, { ReadyStates } from '../manager/manager'
+import { Packet, Types } from '../parser/parser'
+import on from '../shared/on'
+import hasBinary from './hasBinary'
 
 const info = debug('socket-client:socket')
 
@@ -84,7 +84,7 @@ export default class Socket extends EventEmitter {
     return this
   }
 
-  emit(...data: [string, ...any]) {
+  emit<T extends string | symbol>(...data: [T, ...any]) {
     const [event] = data
     if (Events.hasOwnProperty(event)) {
       return super.emit(event, ...data)

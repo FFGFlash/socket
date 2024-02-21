@@ -33,6 +33,7 @@
     "autobind-decorator": "^2.4.0",
     "base64-arraybuffer": "^1.0.2",
     "debug": "^4.3.4",
+    "eventemitter3": "^5.0.1",
     "wtf-8": "^1.0.1",
     "xmlhttprequest-ssl": "^2.1.0"
   },

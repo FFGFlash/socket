@@ -1,7 +1,7 @@
-import EventEmitter from 'events'
-import { deconstructPacket, reconstructPacket, removeBlobs } from './binary'
-import { isBuffer } from '../shared/natives'
 import debug from 'debug'
+import EventEmitter from 'eventemitter3'
+import { isBuffer } from '../shared/natives'
+import { deconstructPacket, reconstructPacket, removeBlobs } from './binary'
 
 const info = debug('socket-client:parser')
 
