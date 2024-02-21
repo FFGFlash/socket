@@ -470,9 +470,9 @@ export default class Engine extends EventEmitter {
     }
 
     const close = () => {
-      if (this.writeBuffer.length) return this.once('drain', close)
-      if (this.upgrading) return waitForUpgrade()
-      done()
+      if (this.writeBuffer.length) this.once('drain', close)
+      else if (this.upgrading) waitForUpgrade()
+      else done()
     }
 
     this.readyState = ReadyState.CLOSING
